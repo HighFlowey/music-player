@@ -5,16 +5,25 @@
     margin: 5px 0;
     box-sizing: border-box;
     padding: 10px;
+    padding-left: 100px;
+    text-wrap: nowrap;
 }
 
 .playlistItem.selected {
-    background-color: #302626;
+    background-color: #1f1853;
 }
 
-.playlistItem h3 {
+.playlistItem .artist {
+    letter-spacing: 0;
     margin: 0 0;
 }
 
-.playlistItem p {
+.playlistItem .name {
+    letter-spacing: 0;
+    margin: 0 0;
+}
+
+.playlistItem .duration {
+    letter-spacing: 0;
     margin: 0 0;
 }

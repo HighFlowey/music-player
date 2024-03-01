@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Song } from "../App";
 import covers from "../assets/covers";
 import "./Player.css";
@@ -6,19 +6,8 @@ import { invoke } from "@tauri-apps/api";
 import { listen } from "@tauri-apps/api/event";
 
 interface Props {
-  musicEntries: Song[];
-  song: Song | undefined;
-  musicIndex: number;
-  setMusicIndex: (index: number) => void;
-}
-
-function uint8ArrayToBase64(data: Uint8Array) {
-  let binary = "";
-  const len = data.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(data[i]);
-  }
-  return window.btoa(binary);
+  music: Song | undefined;
+  audioApi: { prev: () => void; next: () => void };
 }
 
 export function toReadable(x: number) {
@@ -36,180 +25,196 @@ export function toReadable(x: number) {
   return minutes + ":" + seconds;
 }
 
-export default function Player(props: Props) {
-  const [musicTime, setMusicTime] = useState<number>(0);
-  const [musicVolume, setMusicVolume] = useState<number>(0);
-  const [musicDuration, setMusicDuration] = useState<number>(0);
-  const [musicCover, setMusicCover] = useState<string>();
+function uint8ArrayToBase64(data: Uint8Array) {
+  let binary = "";
+  const len = data.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(data[i]);
+  }
+  return window.btoa(binary);
+}
 
-  const volume = useRef<HTMLInputElement>(null);
-  const music = useRef<HTMLAudioElement>(null);
-  const time = useRef<HTMLInputElement>(null);
+function getAlbumCover(songPath: string) {
+  return new Promise<string>((res) => {
+    invoke("get_mp3_cover", {
+      path: songPath,
+    });
 
-  useEffect(() => {
-    music.current?.play();
-  }, [props.song]);
+    listen<number[]>("mp3_cover", async (event) => {
+      const potentialCoverBuffer = event.payload;
+
+      if (
+        potentialCoverBuffer &&
+        Array.isArray(potentialCoverBuffer) &&
+        potentialCoverBuffer.length !== 0
+      ) {
+        const base64 = uint8ArrayToBase64(new Uint8Array(potentialCoverBuffer));
+
+        res(`data:content-type;base64,${base64}`);
+      } else {
+        res(covers.redmooncity);
+      }
+    }).then((unlisten) => {
+      unlisten();
+    });
+  });
+}
+
+function PlayerInfo(props: { music: Song; currentTime: number }) {
+  const [albumCover, setAlbumCover] = useState<string>(covers.redmooncity);
 
   useMemo(async () => {
-    if (props.song) {
-      let path = props.song.path;
-      invoke("get_mp3_cover", {
-        path,
-      });
-
-      const unlisten = await listen<number[]>("mp3_cover", async (event) => {
-        const potentialCoverBuffer = event.payload;
-
-        console.log("albumCover.buffer.length ->", potentialCoverBuffer.length);
-
-        unlisten();
-
-        if (
-          potentialCoverBuffer &&
-          Array.isArray(potentialCoverBuffer) &&
-          potentialCoverBuffer.length !== 0
-        ) {
-          try {
-            const base64 = uint8ArrayToBase64(
-              new Uint8Array(potentialCoverBuffer)
-            );
-
-            const image = `data:content-type;base64,${base64}`;
-
-            setMusicCover(image);
-          } catch (err) {
-            setMusicCover(undefined);
-            console.error(err);
-          }
-        }
-      });
+    if (props.music) {
+      setAlbumCover(await getAlbumCover(props.music.path));
+    } else {
+      setAlbumCover(covers.galaxy);
     }
-  }, [props.song]);
+  }, [props.music]);
 
-  const info = (
+  return (
     <div className="info">
-      {musicCover ? (
-        <img src={musicCover} className="cover"></img>
-      ) : (
-        <img src={covers.galaxy} className="cover"></img>
-      )}
+      <img src={albumCover} className="cover"></img>
       <div className="text">
-        <h1 className="artist">{props.song?.artist || "Unknown Artist"}</h1>
-        <h1 className="name">{props.song?.name || "Artist - Song"}</h1>
+        <h1 className="artist">{props.music.artist}</h1>
+        <h1 className="name">{props.music.name}</h1>
         <h1 className="time">
-          {toReadable(musicTime) + "|" + props.song?.duration}
+          {toReadable(props.currentTime) +
+            "|" +
+            toReadable(props.music.duration)}
         </h1>
       </div>
     </div>
   );
+}
 
-  const inputs = (
+function PlayerInputs(props: {
+  music: Song;
+  audio: React.RefObject<HTMLAudioElement>;
+  audioApi: { prev: () => void; next: () => void };
+  volumeApi: [number, (v: number) => void];
+}) {
+  function toggle() {
+    if (props.audio.current) {
+      if (props.audio.current.paused) {
+        props.audio.current.play();
+      } else {
+        props.audio.current.pause();
+      }
+    }
+  }
+
+  useEffect(() => {
+    function handleInput(e: KeyboardEvent) {
+      switch (e.key) {
+        case " ":
+          toggle();
+          e.preventDefault();
+          break;
+        case "ArrowUp":
+          props.audioApi.prev();
+          e.preventDefault();
+          break;
+        case "ArrowDown":
+          props.audioApi.next();
+          e.preventDefault();
+          break;
+        case "ArrowLeft":
+          props.audioApi.prev();
+          e.preventDefault();
+          break;
+        case "ArrowRight":
+          props.audioApi.next();
+          e.preventDefault();
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", handleInput);
+
+    return () => {
+      window.removeEventListener("keydown", handleInput);
+    };
+  }, [props.music]);
+
+  return (
     <div className="inputs">
       <div className="row2">
-        <button
-          onClick={function () {
-            if (!music.current) {
-              return;
-            }
-
-            if (music.current.paused) {
-              music.current.play();
-            } else {
-              music.current.pause();
-            }
-          }}
-        >
-          {music.current?.paused ? "Play" : "Pause"}
+        <button tabIndex={-1} onClick={toggle}>
+          {props.audio.current?.paused ? "Play" : "Pause"}
         </button>
-        <button
-          onClick={function () {
-            if (props.musicIndex - 1 < 0) {
-              props.setMusicIndex(props.musicEntries.length - 1);
-            } else {
-              props.setMusicIndex(props.musicIndex - 1);
-            }
-          }}
-        >
+        <button tabIndex={-1} onClick={props.audioApi.prev}>
           Previous
         </button>
-        <button
-          onClick={function () {
-            if (props.musicIndex + 1 >= props.musicEntries.length) {
-              props.setMusicIndex(0);
-            } else {
-              props.setMusicIndex(props.musicIndex + 1);
-            }
-          }}
-        >
+        <button tabIndex={-1} onClick={props.audioApi.next}>
           Next
         </button>
         <input
-          ref={volume}
-          value={musicVolume * 100}
-          onChange={function (event) {
-            if (!music.current || !event.currentTarget) {
-              return;
-            }
-
-            const newVolume = Number(event.currentTarget.value) / 100;
-            music.current.volume = newVolume;
+          defaultValue={props.volumeApi[0]}
+          onInput={(e) => {
+            props.volumeApi[1](Number(e.currentTarget.value));
           }}
+          tabIndex={-1}
           type="range"
         ></input>
       </div>
-      <input
-        ref={time}
-        value={(musicTime / musicDuration) * 100}
-        onChange={function (event) {
-          if (!music.current || !event.currentTarget) {
-            return;
-          }
-
-          const newTime =
-            (Number(event.currentTarget.value) / 100) * music.current.duration;
-          music.current.currentTime = newTime;
-        }}
-        type="range"
-        style={{ width: 350 }}
-      ></input>
+      <input tabIndex={-1} type="range" style={{ width: 350 }}></input>
     </div>
   );
+}
+
+export default function Player(props: Props) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const volumeApi = useState(
+    localStorage.getItem("volume") ? Number(localStorage.getItem("volume")) : 50
+  );
+  const audio = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.play();
+      audio.current.onended = () => {
+        props.audioApi.next();
+      };
+    }
+  }, [props.music]);
+
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.volume = volumeApi[0] / 100;
+    }
+  }, [volumeApi[0]]);
+
+  useEffect(() => {
+    function beforeUnload() {
+      localStorage.setItem("volume", String(volumeApi[0]));
+    }
+
+    window.addEventListener("beforeunload", beforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, [volumeApi[0]]);
 
   return (
     <div className="player">
-      {info} {inputs}
+      {props.music && (
+        <PlayerInfo music={props.music} currentTime={currentTime}></PlayerInfo>
+      )}
+      {props.music && (
+        <PlayerInputs
+          music={props.music}
+          audio={audio}
+          audioApi={props.audioApi}
+          volumeApi={volumeApi}
+        ></PlayerInputs>
+      )}
       <audio
-        ref={music}
-        onTimeUpdate={function () {
-          if (!music.current) {
-            return;
-          }
-
-          setMusicTime(music.current.currentTime);
+        ref={audio}
+        src={props.music?.url}
+        onTimeUpdate={(e) => {
+          setCurrentTime(e.currentTarget.currentTime);
         }}
-        onVolumeChange={function () {
-          if (!music.current) {
-            return;
-          }
-
-          setMusicVolume(music.current.volume);
-        }}
-        onCanPlay={function () {
-          if (!music.current) {
-            return;
-          }
-
-          setMusicDuration(music.current.duration);
-          setMusicVolume(music.current.volume);
-        }}
-        onEnded={function () {
-          if (props.musicIndex + 1 >= props.musicEntries.length) {
-            props.setMusicIndex(0);
-          } else {
-            props.setMusicIndex(props.musicIndex + 1);
-          }
-        }}
-        src={props.song?.url}
       ></audio>
     </div>
   );
