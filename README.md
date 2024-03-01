@@ -1,5 +1,6 @@
 # Music player app made with Tauri
 
+![Screenshot01](./public/screenshot01.png)
+
 ### Todos:
-    -> Save user states
     -> Discord rich presence
