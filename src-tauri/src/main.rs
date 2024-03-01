@@ -3,15 +3,26 @@
 
 use audiotags::Tag;
 use serde::Serialize;
-use std::{ffi::OsString, fs::read_dir, path::PathBuf, time::Duration};
+use std::{
+    fs::{read_dir, DirEntry},
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize)]
 struct FileInfo {
     duration: f64,
     path: PathBuf,
-    name: OsString,
+    name: String,
     artist: String,
+}
+
+fn remove_extension(entry: &DirEntry) -> Option<String> {
+    let file_name = entry.file_name();
+    let path = Path::new(&file_name);
+    let file_stem = path.file_stem()?.to_str()?;
+    Some(file_stem.to_string())
 }
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
@@ -33,13 +44,19 @@ fn read_directory(directory_url: &str) -> Vec<FileInfo> {
             if tag_result.is_ok() {
                 let tag = tag_result.unwrap();
                 let artist = tag.artist();
+                let file_name = entry_result.file_name();
+                let file_name_without_extension = remove_extension(&entry_result);
 
                 entries.push(FileInfo {
                     duration: mp3_duration::from_path(entry_result.path())
                         .unwrap_or_else(|_| Duration::from_secs(0))
                         .as_secs_f64(),
                     path: entry_result.path(),
-                    name: entry_result.file_name(),
+                    name: if file_name_without_extension.is_some() {
+                        file_name_without_extension.unwrap()
+                    } else {
+                        file_name.to_str().unwrap().to_string()
+                    },
                     artist: if artist.is_some() {
                         artist.unwrap().to_owned()
                     } else {
