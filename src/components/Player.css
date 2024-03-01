@@ -73,12 +73,12 @@
     width: 100%;
 }
 
-.player .info .text h1 ::-webkit-scrollbar {
+.player .info .text h1::-webkit-scrollbar {
     color: transparent;
     height: 10px;
 }
 
-.player .info .text h1 ::-webkit-scrollbar-thumb {
+.player .info .text h1::-webkit-scrollbar-thumb {
     background: #363636;
     opacity: 1;
 }
