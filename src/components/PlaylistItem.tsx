@@ -1,22 +1,33 @@
+import { useEffect, useRef } from "react";
+import { Song } from "../App";
+import { toReadable } from "./Player";
 import "./PlaylistItem.css";
 
 interface Props {
-  selected?: boolean;
-  title: string;
-  duration: string;
-  key?: string;
+  isPlaying: boolean;
+  music: Song;
 }
 
 export default function PlaylistItem(props: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current && props.isPlaying) {
+      ref.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  });
+
   return (
     <div
-      key={props.key}
-      className={
-        props.selected === true ? "playlistItem selected" : "playlistItem"
-      }
+      ref={ref}
+      className={props.isPlaying ? "playlistItem selected" : "playlistItem"}
     >
-      <h3>{props.title}</h3>
-      <p>Duration: {props.duration}</p>
+      <h3 className="artist">{props.music.artist}</h3>
+      <h3 className="name">{props.music.name}</h3>
+      <p className="duration">Duration: {toReadable(props.music.duration)}</p>
     </div>
   );
 }

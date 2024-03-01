@@ -1,0 +1,8 @@
+.checkboxWithTitle {
+    display: flex;
+    flex-direction: row;
+}
+
+.checkboxWithTitle p {
+    user-select: none;
+}

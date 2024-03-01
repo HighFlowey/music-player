@@ -3,9 +3,9 @@ import "./Home.css";
 import PlaylistItem from "./PlaylistItem";
 
 interface Props {
-  getDirectory: () => void;
   musicEntries: Song[];
-  musicIndex: number;
+  currentMusic: Song | undefined;
+  getDirectory: () => void;
 }
 
 export default function Home(props: Props) {
@@ -13,15 +13,14 @@ export default function Home(props: Props) {
     <div className="home">
       <button onClick={props.getDirectory}>Load Directory</button>
       <ul className="playlist">
-        {props.musicEntries.map((v, i) => {
-          if (i >= props.musicIndex) {
-            return PlaylistItem({
-              selected: i === props.musicIndex,
-              duration: v.duration,
-              title: v.name,
-              key: String(i),
-            });
-          }
+        {props.musicEntries.map((entry, i) => {
+          return (
+            <PlaylistItem
+              isPlaying={props.currentMusic?.index === i}
+              music={entry}
+              key={i}
+            ></PlaylistItem>
+          );
         })}
       </ul>
     </div>
