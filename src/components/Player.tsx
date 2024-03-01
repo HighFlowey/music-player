@@ -92,6 +92,7 @@ function PlayerInputs(props: {
   audio: React.RefObject<HTMLAudioElement>;
   audioApi: { prev: () => void; next: () => void };
   volumeApi: [number, (v: number) => void];
+  timeApi: [number, (v: number) => void];
 }) {
   function toggle() {
     if (props.audio.current) {
@@ -102,6 +103,10 @@ function PlayerInputs(props: {
       }
     }
   }
+
+  useEffect(() => {
+    console.log(props.timeApi[0] * 100);
+  });
 
   useEffect(() => {
     function handleInput(e: KeyboardEvent) {
@@ -157,13 +162,25 @@ function PlayerInputs(props: {
           type="range"
         ></input>
       </div>
-      <input tabIndex={-1} type="range" style={{ width: 350 }}></input>
+      <input
+        value={props.timeApi[0]}
+        onInput={(e) => {
+          props.timeApi[1](Number(e.currentTarget.value));
+        }}
+        min={0}
+        max={props.music.duration}
+        step={1}
+        tabIndex={-1}
+        type="range"
+        style={{ width: 350 }}
+      ></input>
     </div>
   );
 }
 
 export default function Player(props: Props) {
   const [currentTime, setCurrentTime] = useState(0);
+  const timeApi = useState(0);
   const volumeApi = useState(
     localStorage.getItem("volume") ? Number(localStorage.getItem("volume")) : 50
   );
@@ -177,6 +194,12 @@ export default function Player(props: Props) {
       };
     }
   }, [props.music]);
+
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.currentTime = timeApi[0];
+    }
+  }, [timeApi[0]]);
 
   useEffect(() => {
     if (audio.current) {
@@ -207,6 +230,7 @@ export default function Player(props: Props) {
           audio={audio}
           audioApi={props.audioApi}
           volumeApi={volumeApi}
+          timeApi={[currentTime, timeApi[1]]}
         ></PlayerInputs>
       )}
       <audio
