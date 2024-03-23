@@ -12,12 +12,13 @@ license = "MIT"
 tauri-build = { version = "1", features = [] }
 
 [dependencies]
-tauri = { version = "1", features = [ "system-tray", "dialog-open", "protocol-all", "shell-open" ] }
+tauri = { version = "1", features = [ "fs-all", "system-tray", "dialog-open", "protocol-all", "shell-open" ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 audiotags = "0.5.0"
 mp3-duration = "0.1.10"
-discord-rich-presence = "0.2.3"
+discord-sdk = "0.3.6"
+tokio = { version = "1.36.0", features = ["full"] }
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
