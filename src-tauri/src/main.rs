@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+const DISCORD_RETRY_INTERVAL: u64 = 2;
+const DISCORD_RETRY_ATTEMPTS: i32 = 10;
+
 use audiotags::Tag;
 use discord_rich_presence::{
     activity::{Activity, Assets, Timestamps},
@@ -11,6 +14,7 @@ use std::{
     fs::{read_dir, DirEntry},
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
+    thread,
     time::Duration,
 };
 use tauri::{AppHandle, Manager, State};
@@ -45,17 +49,27 @@ struct DiscordRichPresence {
 
 #[tauri::command]
 fn change_rich_presence(app_state: State<'_, AppState>, new_status: DiscordRichPresence) {
-    let mut discord_rich_presence = app_state.rich_presence.write().unwrap();
-    let mut activity = Activity::new()
-        .state(&new_status.state)
-        .details(&new_status.details)
-        .assets(Assets::new().large_image("galaxy"));
+    let discord_client_opt = app_state.rich_presence.write();
 
-    if new_status.playing {
-        activity = activity.timestamps(Timestamps::new().end(new_status.left));
+    if discord_client_opt.is_ok() {
+        let mut discord_client = discord_client_opt.unwrap();
+        let mut activity = Activity::new()
+            .state(&new_status.state)
+            .details(&new_status.details)
+            .assets(Assets::new().large_image("galaxy"));
+
+        if new_status.playing {
+            activity = activity.timestamps(Timestamps::new().end(new_status.left));
+        }
+
+        let result = discord_client.set_activity(activity);
+
+        if result.is_ok() {
+            result.unwrap();
+        } else {
+            println!("set_activity err: {}", result.err().unwrap());
+        }
     }
-
-    discord_rich_presence.set_activity(activity).unwrap();
 }
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
@@ -130,9 +144,22 @@ fn main() {
         })
         .setup(|app| {
             let app_state = app.state::<AppState>();
-            let mut discord_rich_presence = app_state.rich_presence.write().unwrap();
+            let discord_client_opt = app_state.rich_presence.write();
 
-            discord_rich_presence.connect()?;
+            if discord_client_opt.is_ok() {
+                let mut discord_client = discord_client_opt.unwrap();
+
+                for _ in 1..=DISCORD_RETRY_ATTEMPTS {
+                    let result = discord_client.connect();
+
+                    if result.is_ok() {
+                        result.unwrap();
+                        break;
+                    } else {
+                        thread::sleep(Duration::from_secs(DISCORD_RETRY_INTERVAL));
+                    }
+                }
+            }
 
             Ok(())
         })
