@@ -101,6 +101,20 @@ function PlayerInputs(props: {
       } else {
         props.audio.current.pause();
       }
+
+      invoke("change_rich_presence", {
+        newStatus: {
+          details: props.music.artist,
+          state: props.music.name,
+          playing: !props.audio.current.paused,
+          left: Number(
+            (
+              Date.now() +
+              (props.music.duration - props.audio.current.currentTime) * 1000
+            ).toFixed()
+          ),
+        },
+      });
     }
   }
 
@@ -140,6 +154,22 @@ function PlayerInputs(props: {
       window.removeEventListener("keydown", handleInput);
     };
   }, [props.music]);
+
+  /*
+  invoke("change_rich_presence", {
+            newStatus: {
+              details: props.music.artist,
+              state: props.music.name,
+              playing: !audio.current.paused,
+              left: Number(
+                (
+                  Date.now() +
+                  (props.music.duration - audio.current.currentTime) * 1000
+                ).toFixed()
+              ),
+            },
+          });
+  */
 
   return (
     <div className="inputs">
@@ -187,10 +217,41 @@ export default function Player(props: Props) {
   const audio = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    if (audio.current) {
+    if (audio.current && props.music) {
+      let interval = setInterval(() => {
+        if (audio.current && props.music) {
+          invoke("change_rich_presence", {
+            newStatus: {
+              details: props.music.artist,
+              state: props.music.name,
+              playing: !audio.current.paused,
+              left: Number(
+                (
+                  Date.now() +
+                  (props.music.duration - audio.current.currentTime) * 1000
+                ).toFixed()
+              ),
+            },
+          });
+        }
+      });
+
+      invoke("change_rich_presence", {
+        newStatus: {
+          details: props.music.artist,
+          state: props.music.name,
+          playing: true,
+          left: Number((Date.now() + props.music.duration * 1000).toFixed()),
+        },
+      });
+
       audio.current.play();
       audio.current.onended = () => {
         props.audioApi.next();
+      };
+
+      return () => {
+        clearInterval(interval);
       };
     }
   }, [props.music]);
