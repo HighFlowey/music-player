@@ -118,9 +118,9 @@ function PlayerInputs(props: {
     }
   }
 
-  useEffect(() => {
-    console.log(props.timeApi[0] * 100);
-  });
+  // useEffect(() => {
+  //   console.log(props.timeApi[0] * 100);
+  // });
 
   useEffect(() => {
     function handleInput(e: KeyboardEvent) {
@@ -154,22 +154,6 @@ function PlayerInputs(props: {
       window.removeEventListener("keydown", handleInput);
     };
   }, [props.music]);
-
-  /*
-  invoke("change_rich_presence", {
-            newStatus: {
-              details: props.music.artist,
-              state: props.music.name,
-              playing: !audio.current.paused,
-              left: Number(
-                (
-                  Date.now() +
-                  (props.music.duration - audio.current.currentTime) * 1000
-                ).toFixed()
-              ),
-            },
-          });
-  */
 
   return (
     <div className="inputs">
@@ -234,7 +218,7 @@ export default function Player(props: Props) {
             },
           });
         }
-      });
+      }, 5000);
 
       invoke("change_rich_presence", {
         newStatus: {

@@ -1,19 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod es;
+use discord_sdk as ds;
+
 use audiotags::Tag;
-use discord_rich_presence::{
-    activity::{Activity, Assets, Timestamps},
-    DiscordIpc, DiscordIpcClient,
-};
+use ds::activity::Assets;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{read_dir, DirEntry},
     path::{Path, PathBuf},
-    sync::{Arc, RwLock},
     time::Duration,
 };
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, Result, State};
 
 #[derive(Debug, Serialize)]
 struct FileInfo {
@@ -23,9 +22,8 @@ struct FileInfo {
     artist: String,
 }
 
-#[derive(Clone)]
 struct AppState {
-    rich_presence: Arc<RwLock<DiscordIpcClient>>,
+    discord_client: es::Client,
 }
 
 fn remove_extension(entry: &DirEntry) -> Option<String> {
@@ -44,18 +42,34 @@ struct DiscordRichPresence {
 }
 
 #[tauri::command]
-fn change_rich_presence(app_state: State<'_, AppState>, new_status: DiscordRichPresence) {
-    let mut discord_rich_presence = app_state.rich_presence.write().unwrap();
-    let mut activity = Activity::new()
-        .state(&new_status.state)
-        .details(&new_status.details)
-        .assets(Assets::new().large_image("galaxy"));
+async fn change_rich_presence(
+    app_state: State<'_, AppState>,
+    new_status: DiscordRichPresence,
+) -> Result<()> {
+    let mut rp = ds::activity::ActivityBuilder::default()
+        .details(new_status.details)
+        .state(new_status.state)
+        .assets(Assets {
+            large_image: Some("redmooncity".to_owned()),
+            large_text: None,
+            small_image: None,
+            small_text: None,
+        });
 
     if new_status.playing {
-        activity = activity.timestamps(Timestamps::new().end(new_status.left));
+        rp = rp.end_timestamp(new_status.left);
     }
 
-    discord_rich_presence.set_activity(activity).unwrap();
+    app_state
+        .discord_client
+        .discord
+        .lock()
+        .await
+        .update_activity(rp)
+        .await
+        .unwrap();
+
+    Ok(())
 }
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
@@ -121,21 +135,12 @@ fn get_mp3_cover(app: AppHandle, path: PathBuf) {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let discord_client = es::make_client(ds::Subscriptions::ACTIVITY).await;
+
     tauri::Builder::default()
-        .manage(AppState {
-            rich_presence: Arc::new(RwLock::new(
-                DiscordIpcClient::new("1203039006846361762").unwrap(),
-            )),
-        })
-        .setup(|app| {
-            let app_state = app.state::<AppState>();
-            let mut discord_rich_presence = app_state.rich_presence.write().unwrap();
-
-            discord_rich_presence.connect()?;
-
-            Ok(())
-        })
+        .manage(AppState { discord_client })
         .invoke_handler(tauri::generate_handler![
             read_directory,
             get_mp3_cover,
