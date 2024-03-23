@@ -1,6 +1,12 @@
 # Music player app made with Tauri
 
-![Screenshot01](./public/screenshot01.png)
+A simple music player app made with rust using tauri
 
-### Todos:
-    -> Discord rich presence
+# Features
+* Discord rich presence
+* Simple UI
+* Fast
+
+# Screenshots
+![Screenshot of UI](./public/screenshot01.png)
+![Discord Rich Presence](./public/screenshot02.png)
